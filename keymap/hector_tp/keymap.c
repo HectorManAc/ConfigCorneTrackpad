@@ -1,8 +1,9 @@
-// Keymap de Hector: Vial + ratón, teclas en cyan al presionar y una H animada en las pantallas.
+// Keymap de Hector para el Corne Chocolate con trackpad Cirque: Vial, ratón por teclas y trackpad, arcoíris y OLED con privacidad.
 #include QMK_KEYBOARD_H
 #include "transactions.h"
 #include "lib/lib8tion/lib8tion.h"
 #include "atomic_util.h"
+#include "drivers/sensors/cirque_pinnacle_gestures.h"
 
 #define LIGHTS_VERSION 0x54500002 // cambiarlo fuerza a reaplicar los valores por defecto de las luces
 
@@ -164,6 +165,10 @@ static void trackpad_diag_slave(uint8_t in_len, const void *in, uint8_t out_len,
 void keyboard_post_init_user(void) {
     transaction_register_rpc(SYNC_KEY, sync_key_slave_handler);
     transaction_register_rpc(TRACKPAD_KEY, trackpad_slave_handler);
+    // Scroll por la orilla más fácil de activar que el de fábrica (33 %, 16 px, 50°, 18 clics):
+    // orilla del 45 % del radio, arranca con 8 px de giro, acepta 35° y da 24 clics por vuelta.
+    // Solo tiene efecto en la derecha (la que tiene el trackpad).
+    cirque_pinnacle_configure_circular_scroll(45, 8, 6371, 24, false);
 #    ifdef TRACKPAD_DIAG
     transaction_register_rpc(TRACKPAD_DIAG_KEY, trackpad_diag_slave);
 #    endif
