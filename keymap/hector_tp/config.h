@@ -68,11 +68,9 @@
 /* La derecha lee el trackpad y la izquierda recoge lo acumulado cada 4 ms (por defecto 10 ms en las
    dos, desacompasadas: a veces una recogida venía vacía y la siguiente con dos lecturas = brinco). */
 #define POINTING_DEVICE_TASK_THROTTLE_MS 4
-/* Modo relativo: el chip calcula el movimiento (con su filtrado), detecta el toque = clic y tiene
-   una franja de scroll vertical en su borde derecho (POINTING_DEVICE_GESTURES_SCROLL_ENABLE activa
-   CIRQUE_PINNACLE_SIDE_SCROLL_ENABLE en este modo). Antes: modo absoluto con scroll girando por la
-   orilla (circular scroll), confuso de activar. El ancho de la franja lo fija el chip. */
-#define CIRQUE_PINNACLE_POSITION_MODE CIRQUE_PINNACLE_RELATIVE_MODE
+/* Modo absoluto (el de fábrica): tocar = clic y scroll girando por la orilla del círculo (~240 y
+   ~930 bytes). Hector probó el modo relativo con la franja de scroll del chip y prefirió este.
+   La inercia al soltar (POINTING_DEVICE_GESTURES_CURSOR_GLIDE_ENABLE, ~1,1 KB) no cabía. */
 #define CIRQUE_PINNACLE_TAP_ENABLE
 #define POINTING_DEVICE_GESTURES_SCROLL_ENABLE
 
