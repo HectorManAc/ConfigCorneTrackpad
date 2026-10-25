@@ -8,7 +8,8 @@ Es una variante de mi otro Corne ([ConfigCorneV3](https://github.com/HectorManAc
 
 ## Qué hace
 
-- **Ratón**: con el trackpad de la mitad derecha **y** con teclas (mover, clics y rueda; asignables en Vial). En el trackpad: **tocar = clic** y **deslizar por la orilla del círculo = scroll**. Las velocidades de las teclas de ratón son fijas en el firmware.
+- **Ratón**: con el trackpad de la mitad derecha **y** con teclas (mover, clics y rueda; asignables en Vial). En el trackpad: **tocar = clic** y **franja de scroll vertical en el borde derecho** (modo relativo del chip: él calcula el movimiento, el toque y el scroll). Las velocidades de las teclas de ratón son fijas en el firmware.
+- **Layout por defecto**: el de mi otro Corne (`configcornev3.vil`): cada flasheo arranca ya con esas teclas.
 - **Vial**: 4 capas editables en [vial.rocks](https://vial.rocks) (Chrome/Edge) y luces en *Lighting*. No tiene la pestaña *QMK Settings* (no cabía junto al trackpad).
 - **Multimedia**: volumen, play/pausa, siguiente/anterior.
 - **Luces**: **arcoíris** por defecto (onda de izquierda a derecha); en Vial → *Lighting* también *Cycle All* (todo cambia junto) y *Solid Color*.

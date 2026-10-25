@@ -3,40 +3,53 @@
 #include "transactions.h"
 #include "lib/lib8tion/lib8tion.h"
 #include "atomic_util.h"
-#include "drivers/sensors/cirque_pinnacle_gestures.h"
 
 #define LIGHTS_VERSION 0x54500002 // cambiarlo fuerza a reaplicar los valores por defecto de las luces
 
+// Layout de Hector (de ConfigCorneV3/configcornev3.vil), en orden de la matriz: filas 0-3 mitad
+// izquierda, 4-7 derecha (columna 0 = exterior). Capa 1 = ratón y rueda, 2 = números/multimedia/
+// flechas, 3 = QK_BOOT y luces. Así cada flasheo arranca ya con estas teclas.
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-  [0] = LAYOUT_split_3x6_3(
-       KC_TAB,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,                         KC_Y,    KC_U,    KC_I,    KC_O,   KC_P,  KC_BSPC,
-      KC_LCTL,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,                         KC_H,    KC_J,    KC_K,    KC_L, KC_SCLN, KC_QUOT,
-      KC_LSFT,    KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,                         KC_N,    KC_M, KC_COMM,  KC_DOT, KC_SLSH,  KC_ESC,
-                                          KC_LGUI, TL_LOWR,  KC_SPC,     KC_ENT, TL_UPPR, KC_RALT
-  ),
-
-  // Lower: números, ratón a la izquierda, flechas a la derecha
-  [1] = LAYOUT_split_3x6_3(
-       KC_TAB,    KC_1,    KC_2,    KC_3,    KC_4,    KC_5,                         KC_6,    KC_7,    KC_8,    KC_9,    KC_0, KC_BSPC,
-      KC_LCTL, MS_WHLU, MS_BTN2,   MS_UP, MS_BTN1, XXXXXXX,                      KC_LEFT, KC_DOWN,   KC_UP,KC_RIGHT, XXXXXXX, XXXXXXX,
-      KC_LSFT, MS_WHLD, MS_LEFT, MS_DOWN, MS_RGHT, XXXXXXX,                      XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,
-                                          KC_LGUI, _______,  KC_SPC,     KC_ENT, _______, KC_RALT
-  ),
-
-  [2] = LAYOUT_split_3x6_3(
-       KC_TAB, KC_EXLM,   KC_AT, KC_HASH,  KC_DLR, KC_PERC,                      KC_CIRC, KC_AMPR, KC_ASTR, KC_LPRN, KC_RPRN, KC_BSPC,
-      KC_LCTL, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,                      KC_MINS,  KC_EQL, KC_LBRC, KC_RBRC, KC_BSLS,  KC_GRV,
-      KC_LSFT, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,                      KC_UNDS, KC_PLUS, KC_LCBR, KC_RCBR, KC_PIPE, KC_TILD,
-                                          KC_LGUI, _______,  KC_SPC,     KC_ENT, _______, KC_RALT
-  ),
-
-  // Adjust (Lower + Raise): bootloader y brillo/color de las luces
-  [3] = LAYOUT_split_3x6_3(
-      QK_BOOT, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,                      XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,
-      RM_TOGG, RM_HUEU, XXXXXXX, RM_VALU, XXXXXXX, XXXXXXX,                      XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,
-      XXXXXXX, RM_HUED, XXXXXXX, RM_VALD, XXXXXXX, XXXXXXX,                      XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,
-                                          KC_LGUI, _______,  KC_SPC,     KC_ENT, _______, KC_RALT
-  )
+    [0] = {
+        {  KC_TAB,     KC_Q,     KC_W,     KC_E,     KC_R,     KC_T},
+        { KC_LSFT,     KC_A,     KC_S,     KC_D,     KC_F,     KC_G},
+        { KC_LCTL,     KC_Z,     KC_X,     KC_C,     KC_V,     KC_B},
+        {   KC_NO,    KC_NO,    KC_NO,  KC_LGUI,  KC_LALT,   KC_SPC},
+        { KC_BSPC,     KC_P,     KC_O,     KC_I,     KC_U,     KC_Y},
+        { KC_RSFT,  KC_SCLN,     KC_L,     KC_K,     KC_J,     KC_H},
+        {  KC_ESC, KC_SLASH,   KC_DOT, KC_COMMA,     KC_M,     KC_N},
+        {   KC_NO,    KC_NO,    KC_NO,    MO(2),    MO(1),   KC_ENT}
+    },
+    [1] = {
+        {  KC_ESC,  KC_TRNS,  KC_TRNS,    MS_UP,  KC_TRNS,  KC_TRNS},
+        { KC_TRNS,  KC_TRNS,  MS_LEFT,  MS_DOWN,  MS_RGHT,  KC_TRNS},
+        { KC_TRNS,  KC_TRNS,  KC_TRNS,  KC_TRNS,  KC_TRNS,  KC_TRNS},
+        {   KC_NO,    KC_NO,    KC_NO,  KC_TRNS,  KC_TRNS,  KC_TRNS},
+        { KC_TRNS,  KC_TRNS,  KC_TRNS,  MS_BTN2,  KC_TRNS,  KC_TRNS},
+        { KC_TRNS,  KC_TRNS,  MS_ACL1,  MS_ACL2,  MS_BTN1,  MS_BTN3},
+        { KC_TRNS,  KC_TRNS,  MS_WHLR,  MS_WHLU,  MS_WHLD,  MS_WHLL},
+        {   KC_NO,    KC_NO,    KC_NO,  KC_TRNS,  KC_TRNS,  KC_TRNS}
+    },
+    [2] = {
+        {  KC_ESC,     KC_1,     KC_2,     KC_3,     KC_4,     KC_5},
+        { KC_TRNS,  KC_TRNS,  KC_MPRV,  KC_MPLY,  KC_MNXT,  KC_VOLU},
+        { KC_TRNS,  KC_TRNS,  KC_TRNS,  KC_TRNS,  KC_TRNS,  KC_VOLD},
+        {   KC_NO,    KC_NO,    KC_NO,  KC_TRNS,  KC_TRNS,  KC_TRNS},
+        { KC_TRNS,     KC_0,     KC_9,     KC_8,     KC_7,     KC_6},
+        { KC_TRNS,  KC_TRNS, KC_RIGHT,    KC_UP,  KC_DOWN,  KC_LEFT},
+        { KC_TRNS,  KC_TRNS,  KC_TRNS,  KC_TRNS,  KC_TRNS,  KC_TRNS},
+        {   KC_NO,    KC_NO,    KC_NO,  KC_TRNS,  KC_TRNS,  KC_TRNS}
+    },
+    [3] = {
+        { QK_BOOT,    KC_NO,    KC_NO,    KC_NO,    KC_NO,    KC_NO},
+        { RM_TOGG,  RM_HUEU,    KC_NO,  RM_VALU,    KC_NO,    KC_NO},
+        {   KC_NO,  RM_HUED,    KC_NO,  RM_VALD,    KC_NO,    KC_NO},
+        {   KC_NO,    KC_NO,    KC_NO,  KC_LGUI,  KC_TRNS,   KC_SPC},
+        {   KC_NO,    KC_NO,    KC_NO,    KC_NO,    KC_NO,    KC_NO},
+        {   KC_NO,    KC_NO,    KC_NO,    KC_NO,    KC_NO,    KC_NO},
+        {   KC_NO,    KC_NO,    KC_NO,    KC_NO,    KC_NO,    KC_NO},
+        {   KC_NO,    KC_NO,    KC_NO,  KC_RALT,  KC_TRNS,   KC_ENT}
+    }
 };
 
 
@@ -165,11 +178,6 @@ static void trackpad_diag_slave(uint8_t in_len, const void *in, uint8_t out_len,
 void keyboard_post_init_user(void) {
     transaction_register_rpc(SYNC_KEY, sync_key_slave_handler);
     transaction_register_rpc(TRACKPAD_KEY, trackpad_slave_handler);
-    // Scroll por la orilla: solo el 30 % exterior del radio (de fábrica 33 %) para dejar el resto
-    // libre al cursor; arranque, ángulo y clics de fábrica (16 px, 50°, 18 por vuelta). Hector probó
-    // 45 %/8 px/35°/24 y entraba fácil pero le quitaba libertad al cursor.
-    // Solo tiene efecto en la derecha (la que tiene el trackpad).
-    cirque_pinnacle_configure_circular_scroll(30, 16, 9102, 18, false);
 #    ifdef TRACKPAD_DIAG
     transaction_register_rpc(TRACKPAD_DIAG_KEY, trackpad_diag_slave);
 #    endif
@@ -216,7 +224,7 @@ static void mouse_sync_task(void) {
 // izquierda lo recoge (y vacía) por RPC en cada ciclo del pointing device.
 typedef struct {
     int16_t x, y;
-    int8_t  v, h;    // scroll (orilla del círculo); h siempre 0: todo el scroll se pasa a vertical
+    int8_t  v, h;    // scroll (franja del borde derecho, solo vertical: h siempre 0)
     uint8_t buttons; // botones pulsados desde la última recogida (un toque corto no se pierde)
 } tp_acc_t;
 
@@ -252,10 +260,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t m) {
         ATOMIC_BLOCK_FORCEON {
             tp_acc.x += m.x;
             tp_acc.y += m.y;
-            // Solo scroll vertical: el driver da horizontal si el giro empieza en la mitad izquierda
-            // del círculo (h = +clics) y vertical en la derecha (v = -clics); -h lo pasa a vertical
-            // con el mismo sentido de giro.
-            tp_acc.v = add_i8(tp_acc.v, m.v - m.h);
+            tp_acc.v = add_i8(tp_acc.v, m.v); // franja de scroll del chip (solo vertical)
             tp_acc.buttons |= m.buttons;
             tp_buttons_now = m.buttons;
         }
