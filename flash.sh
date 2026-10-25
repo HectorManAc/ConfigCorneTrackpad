@@ -21,15 +21,21 @@ list_ports() { ls /dev/cu.usbmodem* 2>/dev/null | sort; }
 BEFORE="$(list_ports)"
 echo "Puertos actuales: ${BEFORE:-(ninguno)}"
 echo
-echo ">>> Presiona DOS VECES rápido el botón de reset de la mitad ${LABEL}..."
+echo ">>> Presiona el botón de reset de la mitad ${LABEL} (uno o dos toques)..."
 echo "    (esperando hasta ${TIMEOUT} s a que aparezca el bootloader)"
 
+# El puerto debe seguir ahí 1,5 s después de aparecer: un segundo toque del reset lo reinicia y,
+# si se graba justo entonces, la conexión se corta a mitad ("Device not configured").
 PORT=""
 end=$(( $(date +%s) + TIMEOUT ))
 while (( $(date +%s) < end )); do
   NOW="$(list_ports)"
   PORT="$(comm -13 <(echo "$BEFORE") <(echo "$NOW") | grep -m1 . || true)"
-  [[ -n "$PORT" ]] && break
+  if [[ -n "$PORT" ]]; then
+    sleep 1.5
+    [[ -e "$PORT" ]] && break
+    PORT=""
+  fi
   sleep 0.2
 done
 
@@ -39,7 +45,6 @@ if [[ -z "$PORT" ]]; then
 fi
 
 echo "Bootloader detectado en $PORT — flasheando..."
-sleep 0.5  # deja que el puerto termine de enumerar
 avrdude -p atmega32u4 -c avr109 -P "$PORT" -U "flash:w:${HEX}:i"
 rc=$?
 if (( rc == 0 )); then

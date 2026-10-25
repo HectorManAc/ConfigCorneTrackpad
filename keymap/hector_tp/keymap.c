@@ -2,8 +2,9 @@
 #include QMK_KEYBOARD_H
 #include "transactions.h"
 #include "lib/lib8tion/lib8tion.h"
+#include "atomic_util.h"
 
-#define LIGHTS_VERSION 0x48000003 // cambiarlo fuerza a reaplicar los valores por defecto de las luces
+#define LIGHTS_VERSION 0x54500002 // cambiarlo fuerza a reaplicar los valores por defecto de las luces
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   [0] = LAYOUT_split_3x6_3(
@@ -43,38 +44,6 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 void set_autoshift_timeout(uint16_t timeout) {}
 #endif
 
-#ifdef RGB_MATRIX_ENABLE
-// Efecto reactivo invertido: las teclas están encendidas y la que se presiona se apaga y vuelve
-// a encenderse 6 veces más lento que el efecto normal (~3 s). El efecto activo sigue siendo
-// SOLID_REACTIVE_SIMPLE (así Vial controla color, brillo y velocidad de las teclas) y aquí se
-// reemplaza su brillo. Los LEDs de abajo (sin tecla) quedan siempre en cyan a tope.
-#    define UNDERGLOW_HUE 128 // cyan
-#    define FADE_SLOWDOWN 6
-bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
-    hsv_t   hsv      = rgb_matrix_get_hsv();
-    if (hsv.v > RGB_MATRIX_MAXIMUM_BRIGHTNESS) hsv.v = RGB_MATRIX_MAXIMUM_BRIGHTNESS; // por si la EEPROM trae un brillo mayor
-    uint8_t speed    = qadd8(rgb_matrix_get_speed(), 1);
-    for (uint8_t i = led_min; i < led_max; i++) {
-        hsv_t led = hsv;
-        if (HAS_FLAGS(g_led_config.flags[i], LED_FLAG_UNDERGLOW)) {
-            led.h = UNDERGLOW_HUE;
-            led.v = 255;
-        } else {
-            uint16_t offset = 255; // sin pulsación registrada: encendida
-            for (int8_t j = g_last_hit_tracker.count - 1; j >= 0; j--) {
-                if (g_last_hit_tracker.index[j] == i) { // la más reciente de esta tecla
-                    offset = scale16by8(g_last_hit_tracker.tick[j], speed) / FADE_SLOWDOWN; // 0 al presionar
-                    break;
-                }
-            }
-            led.v = scale8(offset > 255 ? 255 : offset, hsv.v);
-        }
-        rgb_t rgb = hsv_to_rgb(led);
-        rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
-    }
-    return false;
-}
-#endif
 
 #ifdef OLED_ENABLE
 // Pantallas verticales (32x128).
@@ -93,6 +62,7 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
 #    define LOG_BOTTOM 105 // y del símbolo más nuevo
 #    define LOG_PITCH 24   // separación vertical entre símbolos
 #    define REDRAW_MS 60    // como mucho un redibujado cada 60 ms
+#    define MOUSE_REDRAW_MS 120 // en modo ratón, menos: cada envío a la OLED retrasa los reportes del cursor
 #    define LOG_LEN 5
 #    define LOG_X 6        // la H en negrita mide 19 px; centrada en 32
 #    define H_GAP 43       // separación entre H (22 px de alto): 3 visibles a la vez
@@ -186,8 +156,17 @@ static void sync_key_slave_handler(uint8_t in_len, const void *in, uint8_t out_l
     }
 }
 
+static void trackpad_slave_handler(uint8_t in_len, const void *in, uint8_t out_len, void *out);
+#    ifdef TRACKPAD_DIAG
+static void trackpad_diag_slave(uint8_t in_len, const void *in, uint8_t out_len, void *out);
+#    endif
+
 void keyboard_post_init_user(void) {
     transaction_register_rpc(SYNC_KEY, sync_key_slave_handler);
+    transaction_register_rpc(TRACKPAD_KEY, trackpad_slave_handler);
+#    ifdef TRACKPAD_DIAG
+    transaction_register_rpc(TRACKPAD_DIAG_KEY, trackpad_diag_slave);
+#    endif
 #    ifdef RGB_MATRIX_ENABLE
     // Solo la primera vez con este firmware: efecto reactivo y color por defecto.
     // Después se respeta lo que se elija y guarde en Vial.
@@ -206,16 +185,91 @@ static void log_send(uint8_t sym) {
 #    define MOVE_HOLD_MS 150 // tras el último movimiento, cuánto sigue contando la dirección
 #    define MOVE_MIN 2       // movimiento mínimo por lectura para contar como dirección
 
-// Envía a la derecha el estado del ratón solo cuando cambia
+#    define MOUSE_SYNC_MS 100 // como mucho un aviso del ratón a la derecha cada 100 ms
+
+static bool     mouse_sync_pending;
+static uint16_t mouse_sync_timer;
+
+// La izquierda actualiza sus flechas al momento; a la derecha le avisa en mouse_sync_task(), sin
+// saturar el TRRS (el trackpad manda sus datos por ahí mismo; avisar en cada cambio daba tirones)
 static void mouse_update(uint8_t state) {
     if (state == mouse_state) return;
     mouse_set(state);
-    uint8_t msg = SYNC_MOUSE | state;
+    mouse_sync_pending = true;
+}
+
+static void mouse_sync_task(void) {
+    if (!mouse_sync_pending || timer_elapsed(mouse_sync_timer) < MOUSE_SYNC_MS) return;
+    mouse_sync_pending = false;
+    mouse_sync_timer   = timer_read();
+    uint8_t msg        = SYNC_MOUSE | mouse_state;
     transaction_rpc_send(SYNC_KEY, 1, &msg);
 }
 
-// El trackpad (mitad derecha) llega aquí en la izquierda: su dirección alimenta las flechas
+// Trackpad sin pérdidas entre mitades: la derecha suma el movimiento de cada lectura en tp_acc y la
+// izquierda lo recoge (y vacía) por RPC en cada ciclo del pointing device.
+typedef struct {
+    int16_t x, y;
+    int8_t  v, h;    // scroll (orilla del círculo)
+    uint8_t buttons; // botones pulsados desde la última recogida (un toque corto no se pierde)
+} tp_acc_t;
+
+static tp_acc_t tp_acc;
+static uint8_t  tp_buttons_now; // estado actual de los botones del trackpad (derecha)
+
+// Derecha, dentro de la comunicación con la izquierda: entrega lo acumulado y lo vacía
+static void trackpad_slave_handler(uint8_t in_len, const void *in, uint8_t out_len, void *out) {
+    memcpy(out, &tp_acc, sizeof(tp_acc));
+    tp_acc.x       = 0;
+    tp_acc.y       = 0;
+    tp_acc.v       = 0;
+    tp_acc.h       = 0;
+    tp_acc.buttons = tp_buttons_now;
+}
+
+static int8_t add_i8(int8_t a, int8_t b) {
+    int16_t r = a + b;
+    return r > INT8_MAX ? INT8_MAX : r < INT8_MIN ? INT8_MIN : r;
+}
+
+static mouse_xy_report_t take_xy(int16_t *pending) {
+    int16_t v = *pending;
+    if (v > MOUSE_REPORT_XY_MAX) v = MOUSE_REPORT_XY_MAX;
+    if (v < MOUSE_REPORT_XY_MIN) v = MOUSE_REPORT_XY_MIN;
+    *pending -= v; // lo que no cabe en este reporte sale en el siguiente
+    return v;
+}
+
 report_mouse_t pointing_device_task_user(report_mouse_t m) {
+    if (!is_keyboard_master()) {
+        // Derecha: acumula y no envía nada (no tiene USB)
+        ATOMIC_BLOCK_FORCEON {
+            tp_acc.x += m.x;
+            tp_acc.y += m.y;
+            tp_acc.v = add_i8(tp_acc.v, m.v); // el scroll llega en pasos pequeños
+            tp_acc.h = add_i8(tp_acc.h, m.h);
+            tp_acc.buttons |= m.buttons;
+            tp_buttons_now = m.buttons;
+        }
+        return (report_mouse_t){0};
+    }
+
+    // Izquierda: recoge lo acumulado en la derecha
+    static int16_t  pend_x, pend_y;
+    static uint8_t  tp_prev_buttons;
+    tp_acc_t        got = {0};
+    if (transaction_rpc_exec(TRACKPAD_KEY, 0, NULL, sizeof(got), &got)) {
+        pend_x += got.x;
+        pend_y += got.y;
+    }
+    m.x       = take_xy(&pend_x);
+    m.y       = take_xy(&pend_y);
+    m.v       = got.v;
+    m.h       = got.h;
+    m.buttons = (m.buttons & ~tp_prev_buttons) | got.buttons; // los de las teclas de ratón se respetan
+    tp_prev_buttons = got.buttons;
+
+    // La dirección del movimiento alimenta las flechas de la pantalla
     static uint16_t move_timer;
     static uint8_t  move_dir;
     uint8_t         dir = 0;
@@ -320,7 +374,68 @@ static void render_h(int16_t y0) {
     draw_cols(cols, LOG_X, y0, true);
 }
 
+#    ifdef TRACKPAD_DIAG
+// Diagnóstico temporal: la derecha (sin pantalla) revisa su bus I2C y se lo cuenta a la izquierda,
+// que lo muestra en vez de la animación: símbolo arriba (★ trackpad iniciado, + algo responde en la
+// dirección del Cirque pero no se inició, X nada responde, − no hay respuesta por el TRRS) y un
+// cuadrito por cada dispositivo I2C que vea la derecha.
+extern bool    touchpad_init;
+static uint8_t diag_result[3]; // [dispositivos I2C, responde en la dirección del Cirque, driver iniciado]
+
+// La derecha escanea en su bucle normal (no dentro de la comunicación con la izquierda, que corre
+// en una interrupción donde los tiempos de espera de I2C no avanzan y un bus atascado la colgaría)
+static void trackpad_diag_task(void) {
+    static uint16_t scan_timer;
+    if (is_keyboard_master() || timer_elapsed(scan_timer) < 1000) return;
+    scan_timer     = timer_read();
+    uint8_t n      = 0;
+    for (uint8_t a = 0x08; a < 0x78; a++) {
+        if (i2c_ping_address(a << 1, 5) == I2C_STATUS_SUCCESS) n++;
+    }
+    diag_result[0] = n;
+    diag_result[1] = i2c_ping_address(CIRQUE_PINNACLE_ADDR << 1, 5) == I2C_STATUS_SUCCESS;
+    diag_result[2] = touchpad_init;
+}
+
+static void trackpad_diag_slave(uint8_t in_len, const void *in, uint8_t out_len, void *out) {
+    memcpy(out, diag_result, sizeof(diag_result));
+}
+
+static void render_trackpad_diag(void) {
+    uint8_t r[3] = {0};
+    bool    ok   = transaction_rpc_exec(TRACKPAD_DIAG_KEY, 0, NULL, sizeof(r), r);
+    oled_clear();
+    render_sym(!ok ? G_MINUS : r[2] ? G_STAR : r[1] ? G_PLUS : G_X, 6);
+    for (uint8_t i = 0; ok && i < r[0] && i < 6; i++) {
+        for (uint8_t y = 0; y < 8; y++) {
+            for (uint8_t x = 0; x < 10; x++) oled_write_pixel(11 + x, 40 + i * 14 + y, true);
+        }
+    }
+}
+#    endif
+
+void housekeeping_task_user(void) {
+    if (is_keyboard_master()) mouse_sync_task();
+#    ifdef TRACKPAD_DIAG
+    trackpad_diag_task();
+#    endif
+}
+
 bool oled_task_user(void) {
+#    ifdef TRACKPAD_DIAG
+    static uint16_t diag_timer;
+    static bool     started;
+    if (!started) { // señal inmediata: si la pantalla sigue en blanco, la izquierda no llega aquí
+        started = true;
+        oled_clear();
+        render_sym(G_MINUS, 6);
+    }
+    if (is_keyboard_master() && timer_elapsed(diag_timer) > 1000) {
+        diag_timer = timer_read();
+        render_trackpad_diag();
+    }
+    return false;
+#    endif
     static uint16_t timer;
     static uint8_t  scroll, turn, h_off;
     static uint8_t  cipher[H_SLOTS]; // cuadros que le quedan cifrada a cada H (0 = H)
@@ -334,14 +449,14 @@ bool oled_task_user(void) {
         memset(log_keys, 0, sizeof(log_keys));
         log_dirty = true;
     }
-    if (!(log_dirty || mouse_active || !typing) || timer_elapsed(timer) < REDRAW_MS) return false;
+    if (!(log_dirty || mouse_active || !typing) || timer_elapsed(timer) < (mouse_active ? MOUSE_REDRAW_MS : REDRAW_MS)) return false;
     timer = timer_read();
 
     if (mouse_active) {
-        // Las flechas suben 6 px por cuadro; cada 24 px entra una nueva por abajo con la
+        // Las flechas suben 12 px por cuadro (cada 120 ms); cada 24 px entra una nueva por abajo con la
         // siguiente dirección pulsada (rotando si hay varias) o una estrella si se hace clic
         oled_clear();
-        scroll += 6;
+        scroll += 12;
         if (scroll >= LOG_PITCH) {
             scroll -= LOG_PITCH;
             memmove(&lane[1], &lane[0], LANE_LEN - 1);

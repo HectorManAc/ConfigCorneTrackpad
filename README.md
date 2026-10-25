@@ -4,20 +4,20 @@ Firmware Vial personalizado para mi Corne con trackpad: PCB **Corne Chocolate v2
 
 Es una variante de mi otro Corne ([ConfigCorneV3](https://github.com/HectorManAc/ConfigCorneV3)): misma pantalla, luces y privacidad, más el trackpad.
 
-> **Estado:** todavía sin probar en el teclado (no encendía al empezar). La conexión del trackpad (I2C, compartiendo bus con la pantalla) está supuesta y hay que confirmarla.
+> **Estado:** funcionando en el teclado. El trackpad va por I2C en los pines de la pantalla de la mitad derecha (esa mitad no tiene pantalla). Tocar = clic y scroll por la orilla recién añadidos, pendientes de probar.
 
 ## Qué hace
 
-- **Trackpad**: mueve el cursor desde la mitad derecha. Los clics se pueden hacer también con teclas (MS_BTN1/2 en Vial).
-- **Vial**: 4 capas editables en [vial.rocks](https://vial.rocks) (Chrome/Edge) y *QMK Settings*.
+- **Ratón**: con el trackpad de la mitad derecha **y** con teclas (mover, clics y rueda; asignables en Vial). En el trackpad: **tocar = clic** y **deslizar por la orilla del círculo = scroll**. Las velocidades de las teclas de ratón son fijas en el firmware.
+- **Vial**: 4 capas editables en [vial.rocks](https://vial.rocks) (Chrome/Edge) y luces en *Lighting*. No tiene la pestaña *QMK Settings* (no cabía junto al trackpad).
 - **Multimedia**: volumen, play/pausa, siguiente/anterior.
-- **Luces**: LEDs de abajo siempre en cyan a tope; teclas en morado y la que se presiona se apaga y vuelve a encenderse (~3 s). Color, brillo y velocidad de las teclas en Vial → *Lighting* (no usar "Solid Color").
+- **Luces**: **arcoíris** por defecto (onda de izquierda a derecha); en Vial → *Lighting* también *Cycle All* (todo cambia junto) y *Solid Color*.
 - **Pantallas** (verticales, las dos mitades):
   - En reposo: una columna de H que sube sin parar y se "descifra" al azar (kanji cambiando hasta quedar en H).
   - Al escribir, **por privacidad no se muestra la tecla**: cada pulsación sale como un kanji al azar.
-  - Íconos para multimedia y ⌘/⌥+Tab; al mover el trackpad suben flechas en la dirección del cursor.
+  - Íconos para multimedia y ⌘/⌥+Tab; al mover el ratón (trackpad o teclas) suben flechas en la dirección del cursor.
 
-Para que cupiera el trackpad (~2,8 KB) se quitaron **las teclas de mover el ratón y la rueda con teclas**.
+Para que cupieran el trackpad (~2,8 KB), el ratón por teclas y los gestos se quitaron **QMK Settings** y el efecto de luces reactivo del otro Corne. La inercia al soltar el dedo no cabe.
 
 ## Archivos
 
@@ -41,7 +41,7 @@ Requiere `avrdude` (`brew install avrdude`).
    FLASH_TIMEOUT=300 ./flash.sh IZQUIERDA
    ```
 
-3. Cuando lo pida, presiona **dos veces rápido** el reset de esa mitad.
+3. Cuando lo pida, presiona **una vez** el reset de esa mitad (con un toque basta; el script espera a que el puerto esté estable, así que dos toques también funcionan).
 4. Repite con la otra mitad (`DERECHA`).
 5. Usa el teclado con el USB en la **mitad izquierda**.
 

@@ -8,8 +8,8 @@ RGB_MATRIX_ENABLE   = yes
 VIALRGB_ENABLE      = yes # elegir color/brillo/velocidad desde Vial
 
 # Ratón + apartado de ajustes en Vial (QMK Settings -> Mouse keys)
-MOUSEKEY_ENABLE     = no  # el trackpad mueve el cursor; los clics como teclas siguen (pointing device)
-QMK_SETTINGS        = yes
+MOUSEKEY_ENABLE     = yes # ratón con teclas además del trackpad
+QMK_SETTINGS        = no  # sin espacio junto al trackpad + teclas de ratón; Vial sigue funcionando
 
 # Pantallas con la H animada
 OLED_ENABLE         = yes
