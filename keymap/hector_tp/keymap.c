@@ -165,10 +165,11 @@ static void trackpad_diag_slave(uint8_t in_len, const void *in, uint8_t out_len,
 void keyboard_post_init_user(void) {
     transaction_register_rpc(SYNC_KEY, sync_key_slave_handler);
     transaction_register_rpc(TRACKPAD_KEY, trackpad_slave_handler);
-    // Scroll por la orilla más fácil de activar que el de fábrica (33 %, 16 px, 50°, 18 clics):
-    // orilla del 45 % del radio, arranca con 8 px de giro, acepta 35° y da 24 clics por vuelta.
+    // Scroll por la orilla: solo el 30 % exterior del radio (de fábrica 33 %) para dejar el resto
+    // libre al cursor; arranque, ángulo y clics de fábrica (16 px, 50°, 18 por vuelta). Hector probó
+    // 45 %/8 px/35°/24 y entraba fácil pero le quitaba libertad al cursor.
     // Solo tiene efecto en la derecha (la que tiene el trackpad).
-    cirque_pinnacle_configure_circular_scroll(45, 8, 6371, 24, false);
+    cirque_pinnacle_configure_circular_scroll(30, 16, 9102, 18, false);
 #    ifdef TRACKPAD_DIAG
     transaction_register_rpc(TRACKPAD_DIAG_KEY, trackpad_diag_slave);
 #    endif
@@ -215,7 +216,7 @@ static void mouse_sync_task(void) {
 // izquierda lo recoge (y vacía) por RPC en cada ciclo del pointing device.
 typedef struct {
     int16_t x, y;
-    int8_t  v, h;    // scroll (orilla del círculo)
+    int8_t  v, h;    // scroll (orilla del círculo); h siempre 0: todo el scroll se pasa a vertical
     uint8_t buttons; // botones pulsados desde la última recogida (un toque corto no se pierde)
 } tp_acc_t;
 
@@ -251,8 +252,10 @@ report_mouse_t pointing_device_task_user(report_mouse_t m) {
         ATOMIC_BLOCK_FORCEON {
             tp_acc.x += m.x;
             tp_acc.y += m.y;
-            tp_acc.v = add_i8(tp_acc.v, m.v); // el scroll llega en pasos pequeños
-            tp_acc.h = add_i8(tp_acc.h, m.h);
+            // Solo scroll vertical: el driver da horizontal si el giro empieza en la mitad izquierda
+            // del círculo (h = +clics) y vertical en la derecha (v = -clics); -h lo pasa a vertical
+            // con el mismo sentido de giro.
+            tp_acc.v = add_i8(tp_acc.v, m.v - m.h);
             tp_acc.buttons |= m.buttons;
             tp_buttons_now = m.buttons;
         }
