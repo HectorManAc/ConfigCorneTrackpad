@@ -69,6 +69,10 @@
    los bordes y recalibra al arrancar. Si aún suelta el dedo, probar además
    #define CIRQUE_PINNACLE_ATTENUATION EXTREG__TRACK_ADCCONFIG__ADC_ATTENUATE_1X (la máxima). */
 #define CIRQUE_PINNACLE_CURVED_OVERLAY
+/* Sensibilidad al tacto: con la cubierta curva el driver usa 2X y detectaba el dedo casi sin tocar;
+   con 4X (la de fábrica para cubierta plana) soltaba el dedo a mitad del trazo. 3X es el punto medio.
+   Si aún detecta de más, probar 4X; si vuelve a soltar el dedo, regresar a 2X. */
+#define CIRQUE_PINNACLE_ATTENUATION EXTREG__TRACK_ADCCONFIG__ADC_ATTENUATE_3X
 /* La derecha lee el trackpad y la izquierda recoge lo acumulado cada 4 ms (por defecto 10 ms en las
    dos, desacompasadas: a veces una recogida venía vacía y la siguiente con dos lecturas = brinco). */
 #define POINTING_DEVICE_TASK_THROTTLE_MS 4
