@@ -12,7 +12,7 @@ Es una variante de mi otro Corne ([ConfigCorneV3](https://github.com/HectorManAc
 - **Layout por defecto**: el de mi otro Corne (`configcornev3.vil`): cada flasheo arranca ya con esas teclas.
 - **Vial**: 4 capas editables en [vial.rocks](https://vial.rocks) (Chrome/Edge) y luces en *Lighting*. No tiene la pestaña *QMK Settings* (no cabía junto al trackpad).
 - **Multimedia**: volumen, play/pausa, siguiente/anterior.
-- **Luces**: **arcoíris** por defecto (onda de izquierda a derecha); en Vial → *Lighting* también *Cycle All* (todo cambia junto) y *Solid Color*.
+- **Luces**: **arcoíris** por defecto (onda de izquierda a derecha); en Vial → *Lighting* también *Cycle All* (todo cambia junto), *Cycle Up/Down*, *Rainbow Moving Chevron*, *Hue Wave* y *Solid Color*.
 - **Pantallas** (verticales, las dos mitades):
   - En reposo: una columna de H que sube sin parar y se "descifra" al azar (kanji cambiando hasta quedar en H).
   - Al escribir, **por privacidad no se muestra la tecla**: cada pulsación sale como un kanji al azar.

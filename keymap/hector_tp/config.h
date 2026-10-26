@@ -16,7 +16,8 @@
 #define LAYER_STATE_8BIT
 #define DYNAMIC_KEYMAP_MACRO_COUNT 0
 
-/* Luces: arcoíris por defecto (onda de izquierda a derecha); en Vial → Lighting también "Cycle All".
+/* Luces: arcoíris por defecto (onda de izquierda a derecha); en Vial → Lighting también "Cycle All",
+   "Cycle Up/Down", "Rainbow Moving Chevron" y "Hue Wave".
    El efecto reactivo invertido del otro Corne se quitó para que cupieran los gestos del trackpad.
    Brillo máximo: el de fábrica del Corne (120). Si el teclado se reinicia o se desconecta solo
    por falta de corriente (fusible de ~500 mA del Pro Micro), bajarlo aquí. */
@@ -24,6 +25,9 @@
 #define RGB_MATRIX_MAXIMUM_BRIGHTNESS 120
 #define ENABLE_RGB_MATRIX_CYCLE_LEFT_RIGHT
 #define ENABLE_RGB_MATRIX_CYCLE_ALL
+#define ENABLE_RGB_MATRIX_CYCLE_UP_DOWN
+#define ENABLE_RGB_MATRIX_RAINBOW_MOVING_CHEVRON
+#define ENABLE_RGB_MATRIX_HUE_WAVE
 #define RGB_MATRIX_DEFAULT_MODE RGB_MATRIX_CYCLE_LEFT_RIGHT
 #define RGB_MATRIX_DEFAULT_SAT 255
 #define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS
