@@ -252,6 +252,9 @@ static int8_t add_i8(int8_t a, int8_t b) {
     return r > INT8_MAX ? INT8_MAX : r < INT8_MIN ? INT8_MIN : r;
 }
 
+#    define TAP_MOVE_MIN 4   // movimiento por lectura que ya cuenta como deslizar (menos es temblor del dedo)
+#    define TAP_MOVE_MS 150  // si hubo movimiento en este tiempo antes del clic, se descarta
+
 static mouse_xy_report_t take_xy(int16_t *pending) {
     int16_t v = *pending;
     if (v > MOUSE_REPORT_XY_MAX) v = MOUSE_REPORT_XY_MAX;
@@ -262,7 +265,13 @@ static mouse_xy_report_t take_xy(int16_t *pending) {
 
 report_mouse_t pointing_device_task_user(report_mouse_t m) {
     if (!is_keyboard_master()) {
-        // Derecha: acumula y no envía nada (no tiene USB)
+        // Derecha: el driver da clic a cualquier contacto corto, aunque el dedo se haya movido; si
+        // hubo movimiento en los últimos TAP_MOVE_MS no es un toque sino un deslizamiento corto
+        static uint16_t moved_timer;
+        if (abs(m.x) + abs(m.y) >= TAP_MOVE_MIN) moved_timer = timer_read();
+        if ((m.buttons & MOUSE_BTN1) && timer_elapsed(moved_timer) < TAP_MOVE_MS) m.buttons &= ~MOUSE_BTN1;
+
+        // Acumula y no envía nada (no tiene USB)
         ATOMIC_BLOCK_FORCEON {
             tp_acc.x += m.x;
             tp_acc.y += m.y;
